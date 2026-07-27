@@ -65,6 +65,10 @@ const loginUser = async (req, res) => {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
+    if (user.status === "Suspended") {
+      return res.status(403).json({ message: "Your account has been suspended by the Admin. Please contact support." });
+    }
+
     res.status(200).json({
       success: true,
       message: "Login successful",
