@@ -7,9 +7,11 @@ const {
   getMe,
   updateMe,
   logoutUser,
+  getAllUsers,
+  updateUserStatus,
 } = require("../controllers/userController");
 
-const { protect } = require("../middleware/authMiddleware");
+const { protect, authorizeRoles } = require("../middleware/authMiddleware");
 
 // ── Public ──────────────────────────────────────
 router.post("/register", registerUser);       // POST /api/users/register
@@ -19,5 +21,9 @@ router.post("/login",    loginUser);          // POST /api/users/login
 router.get("/me",        protect, getMe);     // GET  /api/users/me
 router.put("/me",        protect, updateMe);  // PUT  /api/users/me
 router.post("/logout",   protect, logoutUser);// POST /api/users/logout
+
+// ── Admin ───────────────────────────────────────
+router.get("/",          protect, authorizeRoles("admin"), getAllUsers);
+router.put("/:id/status", protect, authorizeRoles("admin"), updateUserStatus);
 
 module.exports = router;

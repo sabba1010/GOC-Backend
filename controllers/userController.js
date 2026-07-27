@@ -130,4 +130,49 @@ const logoutUser = async (req, res) => {
   });
 };
 
-module.exports = { registerUser, loginUser, getMe, updateMe, logoutUser };
+// ──────────────────────────────────────────────
+// @route   GET /api/users
+// @desc    Get all users (Admin only)
+// @access  Private/Admin
+// ──────────────────────────────────────────────
+const getAllUsers = async (req, res) => {
+  try {
+    const users = await User.find({}).select("-password");
+    res.status(200).json({ success: true, count: users.length, users });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+// ──────────────────────────────────────────────
+// @route   PUT /api/users/:id/status
+// @desc    Update user status (Active/Suspended)
+// @access  Private/Admin
+// ──────────────────────────────────────────────
+const updateUserStatus = async (req, res) => {
+  try {
+    const { status } = req.body;
+    if (!["Active", "Suspended"].includes(status)) {
+      return res.status(400).json({ message: "Invalid status value" });
+    }
+
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Prevent changing admin status if it's the main admin
+    if (user.role === "admin" && user.email === "admin@girlsoncampus.org") {
+      return res.status(403).json({ message: "Cannot suspend super admin" });
+    }
+
+    user.status = status;
+    await user.save();
+
+    res.status(200).json({ success: true, message: `User status updated to ${status}`, user });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+module.exports = { registerUser, loginUser, getMe, updateMe, logoutUser, getAllUsers, updateUserStatus };
