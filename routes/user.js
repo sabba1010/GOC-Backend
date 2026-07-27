@@ -11,6 +11,7 @@ const {
   updateUserStatus,
   toggleSaveOpportunity,
   toggleApplyOpportunity,
+  getAllSubmissions,
 } = require("../controllers/userController");
 
 const { protect, authorizeRoles } = require("../middleware/authMiddleware");
@@ -28,6 +29,7 @@ router.post("/apply-opportunity/:id", protect, toggleApplyOpportunity);
 
 // ── Admin ───────────────────────────────────────
 router.get("/",          protect, authorizeRoles("admin"), getAllUsers);
+router.get("/submissions", protect, authorizeRoles("admin"), getAllSubmissions);
 router.put("/:id/status", protect, authorizeRoles("admin"), updateUserStatus);
 
 module.exports = router;

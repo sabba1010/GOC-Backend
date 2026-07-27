@@ -247,6 +247,51 @@ const toggleApplyOpportunity = async (req, res) => {
   }
 };
 
+// ──────────────────────────────────────────────
+// @route   GET /api/users/submissions
+// @desc    Get all student submissions
+// @access  Private/Admin
+// ──────────────────────────────────────────────
+const getAllSubmissions = async (req, res) => {
+  try {
+    const users = await User.find({ 
+      appliedOpportunities: { $exists: true, $not: { $size: 0 } } 
+    }).populate("appliedOpportunities").select("-password");
+    
+    let submissions = [];
+    users.forEach(user => {
+      user.appliedOpportunities.forEach(opp => {
+        submissions.push({
+          id: `${user._id}_${opp._id}`,
+          user: {
+            id: user._id,
+            name: user.name,
+            email: user.email,
+            school: user.school,
+            certificates: user.certificates,
+            customFields: user.customFields,
+            avatar: user.avatar,
+            bio: user.bio,
+            username: user.username
+          },
+          opportunity: {
+            id: opp._id,
+            title: opp.title,
+            category: opp.category,
+            deadline: opp.deadline
+          },
+          status: "Pending", // Default status for now
+          appliedAt: user.updatedAt // Fallback date since we don't store timestamp per apply
+        });
+      });
+    });
+    
+    res.status(200).json({ success: true, submissions });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
 module.exports = {
   registerUser,
   loginUser,
@@ -257,4 +302,5 @@ module.exports = {
   updateUserStatus,
   toggleSaveOpportunity,
   toggleApplyOpportunity,
+  getAllSubmissions,
 };
