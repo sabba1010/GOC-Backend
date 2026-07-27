@@ -95,7 +95,10 @@ const loginUser = async (req, res) => {
 // ──────────────────────────────────────────────
 const getMe = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select("-password");
+    const user = await User.findById(req.user.id)
+      .select("-password")
+      .populate("savedOpportunities")
+      .populate("appliedOpportunities");
     if (!user) return res.status(404).json({ message: "User not found" });
     res.status(200).json({ success: true, user });
   } catch (error) {
@@ -179,4 +182,70 @@ const updateUserStatus = async (req, res) => {
   }
 };
 
-module.exports = { registerUser, loginUser, getMe, updateMe, logoutUser, getAllUsers, updateUserStatus };
+// ──────────────────────────────────────────────
+// @route   POST /api/users/save-opportunity/:id
+// @desc    Toggle saving an opportunity
+// @access  Private
+// ──────────────────────────────────────────────
+const toggleSaveOpportunity = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const oppId = req.params.id;
+    const isSaved = user.savedOpportunities.includes(oppId);
+
+    if (isSaved) {
+      user.savedOpportunities = user.savedOpportunities.filter(
+        (id) => id.toString() !== oppId
+      );
+    } else {
+      user.savedOpportunities.push(oppId);
+    }
+
+    await user.save();
+    res.status(200).json({ success: true, savedOpportunities: user.savedOpportunities });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+// ──────────────────────────────────────────────
+// @route   POST /api/users/apply-opportunity/:id
+// @desc    Toggle applying to an opportunity
+// @access  Private
+// ──────────────────────────────────────────────
+const toggleApplyOpportunity = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const oppId = req.params.id;
+    const isApplied = user.appliedOpportunities.includes(oppId);
+
+    if (isApplied) {
+      user.appliedOpportunities = user.appliedOpportunities.filter(
+        (id) => id.toString() !== oppId
+      );
+    } else {
+      user.appliedOpportunities.push(oppId);
+    }
+
+    await user.save();
+    res.status(200).json({ success: true, appliedOpportunities: user.appliedOpportunities });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+module.exports = {
+  registerUser,
+  loginUser,
+  getMe,
+  updateMe,
+  logoutUser,
+  getAllUsers,
+  updateUserStatus,
+  toggleSaveOpportunity,
+  toggleApplyOpportunity,
+};

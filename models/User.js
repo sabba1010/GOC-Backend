@@ -50,6 +50,18 @@ const userSchema = new mongoose.Schema(
       enum: ["Active", "Suspended"],
       default: "Active",
     },
+    savedOpportunities: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Opportunity",
+      },
+    ],
+    appliedOpportunities: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Opportunity",
+      },
+    ],
   },
   { timestamps: true }
 );
