@@ -1,6 +1,6 @@
 require("dotenv").config();
 const express = require("express");
-const cors    = require("cors");
+const cors = require("cors");
 const connectDB = require("./config/db");
 
 const app = express();
@@ -10,7 +10,7 @@ connectDB();
 
 // ── Middleware ─────────────────────────────────
 app.use(cors({
-  origin: ["http://localhost:5173", "http://localhost:3000"],
+  origin: ["http://localhost:5173", "http://localhost:3000", "http://localhost:8080"],
   credentials: true,
 }));
 app.use(express.json());
@@ -22,7 +22,7 @@ app.get("/", (req, res) => {
 });
 
 // ── Routes ─────────────────────────────────────
-app.use("/api/users",        require("./routes/user"));
+app.use("/api/users", require("./routes/user"));
 // Future routes:
 // app.use("/api/opportunities", require("./routes/opportunity"));
 // app.use("/api/mentors",       require("./routes/mentor"));
