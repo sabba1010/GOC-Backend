@@ -113,10 +113,19 @@ const getMe = async (req, res) => {
 // ──────────────────────────────────────────────
 const updateMe = async (req, res) => {
   try {
-    const { name, bio, avatar } = req.body;
+    const { name, bio, avatar, school, email, certificates, customFields } = req.body;
+    
+    // Check if email is being changed and is already in use
+    if (email && email !== req.user.email) {
+      const existingUser = await User.findOne({ email });
+      if (existingUser && existingUser._id.toString() !== req.user.id) {
+        return res.status(400).json({ message: "Email is already taken" });
+      }
+    }
+
     const user = await User.findByIdAndUpdate(
       req.user.id,
-      { name, bio, avatar },
+      { name, bio, avatar, school, email, certificates, customFields },
       { new: true, runValidators: true }
     ).select("-password");
     res.status(200).json({ success: true, user });

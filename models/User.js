@@ -45,6 +45,22 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    school: {
+      type: String,
+      default: "",
+    },
+    certificates: [
+      {
+        title: { type: String },
+        url: { type: String },
+      },
+    ],
+    customFields: [
+      {
+        label: { type: String },
+        value: { type: String },
+      },
+    ],
     status: {
       type: String,
       enum: ["Active", "Suspended"],
