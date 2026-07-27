@@ -21,10 +21,17 @@ app.get("/", (req, res) => {
   res.json({ message: "🎀 GOC API is running!", status: "ok" });
 });
 
+const path = require("path");
+
 // ── Routes ─────────────────────────────────────
 app.use("/api/users", require("./routes/user"));
+app.use("/api/opportunities", require("./routes/opportunity"));
+app.use("/api/upload", require("./routes/upload"));
+
+// ── Serve Static Files ─────────────────────────
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
 // Future routes:
-// app.use("/api/opportunities", require("./routes/opportunity"));
 // app.use("/api/mentors",       require("./routes/mentor"));
 // app.use("/api/applications",  require("./routes/application"));
 // app.use("/api/resources",     require("./routes/resource"));
