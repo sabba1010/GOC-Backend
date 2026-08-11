@@ -10,7 +10,24 @@ connectDB();
 
 // ── Middleware ─────────────────────────────────
 app.use(cors({
-  origin: ["http://localhost:5173", "http://localhost:3000", "http://localhost:8080"],
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+    
+    const allowedOrigins = [
+      "http://localhost:5173",
+      "http://localhost:3000",
+      "http://localhost:8080",
+      "https://duplicate-web-pal.vercel.app"
+    ];
+    
+    const isVercel = origin.endsWith(".vercel.app");
+    
+    if (allowedOrigins.includes(origin) || isVercel) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
   credentials: true,
 }));
 app.use(express.json());
