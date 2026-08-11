@@ -27,14 +27,14 @@ const path = require("path");
 app.use("/api/users", require("./routes/user"));
 app.use("/api/opportunities", require("./routes/opportunity"));
 app.use("/api/upload", require("./routes/upload"));
+app.use("/api/resources", require("./routes/resource"));
 
-// ── Serve Static Files ─────────────────────────
+// ── Serve Static Files ─────────────────────────────────────
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // Future routes:
 // app.use("/api/mentors",       require("./routes/mentor"));
 // app.use("/api/applications",  require("./routes/application"));
-// app.use("/api/resources",     require("./routes/resource"));
 
 // ── 404 Handler ────────────────────────────────
 app.use((req, res) => {
