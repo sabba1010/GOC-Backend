@@ -29,6 +29,39 @@ const resourceSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    externalLink: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    deadline: {
+      type: Date,
+      default: null,
+    },
+    resourceType: {
+      type: String,
+      enum: [
+        "Scholarship",
+        "Internship",
+        "Fellowship",
+        "Program",
+        "Event",
+        "Guide",
+        "Article",
+        "General Resource",
+      ],
+      default: "General Resource",
+    },
+    locationType: {
+      type: String,
+      enum: ["Virtual", "In-person", "Hybrid", "Location-specific"],
+      default: "Virtual",
+    },
+    locationAddress: {
+      type: String,
+      default: "",
+      trim: true,
+    },
     uploadedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",

@@ -7,7 +7,16 @@ const fs = require("fs");
 // @access  Private/Admin
 const createResource = async (req, res) => {
   try {
-    const { title, description, category } = req.body;
+    const {
+      title,
+      description,
+      category,
+      externalLink,
+      deadline,
+      resourceType,
+      locationType,
+      locationAddress,
+    } = req.body;
 
     if (!title || !description) {
       return res.status(400).json({ message: "Title and description are required" });
@@ -35,6 +44,11 @@ const createResource = async (req, res) => {
       image: imageUrl,
       pdfFile: pdfUrl,
       pdfOriginalName,
+      externalLink: externalLink || "",
+      deadline: deadline ? new Date(deadline) : null,
+      resourceType: resourceType || "General Resource",
+      locationType: locationType || "Virtual",
+      locationAddress: locationAddress || "",
       uploadedBy: req.user._id,
       status: "Published",
     });
