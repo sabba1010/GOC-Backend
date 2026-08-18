@@ -78,6 +78,22 @@ const userSchema = new mongoose.Schema(
         ref: "Opportunity",
       },
     ],
+    chatMutedUntil: {
+      type: Date,
+      default: null,
+    },
+    chatRestrictedUntil: {
+      type: Date,
+      default: null,
+    },
+    chatAccessRevoked: {
+      type: Boolean,
+      default: false,
+    },
+    chatMuteNotificationsUntil: {
+      type: Date,
+      default: null,
+    },
   },
   { timestamps: true }
 );

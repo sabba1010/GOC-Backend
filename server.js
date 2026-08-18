@@ -1,5 +1,6 @@
 require("dotenv").config();
 const express = require("express");
+const path = require("path");
 const cors = require("cors");
 const connectDB = require("./config/db");
 
@@ -38,20 +39,45 @@ app.get("/", (req, res) => {
   res.json({ message: "🎀 GOC API is running!", status: "ok" });
 });
 
-const path = require("path");
+const http = require("http");
+const { Server } = require("socket.io");
+const { setupChatSocket } = require("./socket/chatSocket");
+
+const server = http.createServer(app);
+
+const io = new Server(server, {
+  cors: {
+    origin: function (origin, callback) {
+      if (!origin) return callback(null, true);
+      const allowedOrigins = [
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://localhost:8080",
+        "https://duplicate-web-pal.vercel.app",
+      ];
+      const isVercel = origin.endsWith(".vercel.app");
+      if (allowedOrigins.includes(origin) || isVercel) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true,
+  },
+});
+
+setupChatSocket(io);
 
 // ── Routes ─────────────────────────────────────
 app.use("/api/users", require("./routes/user"));
 app.use("/api/opportunities", require("./routes/opportunity"));
 app.use("/api/upload", require("./routes/upload"));
 app.use("/api/resources", require("./routes/resource"));
+app.use("/api/chat", require("./routes/chat"));
+app.use("/api/admin/chat", require("./routes/adminChat"));
 
 // ── Serve Static Files ─────────────────────────────────────
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-
-// Future routes:
-// app.use("/api/mentors",       require("./routes/mentor"));
-// app.use("/api/applications",  require("./routes/application"));
 
 // ── 404 Handler ────────────────────────────────
 app.use((req, res) => {
@@ -66,6 +92,6 @@ app.use((err, req, res, next) => {
 
 // ── Start Server ───────────────────────────────
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
+server.listen(PORT, () => {
+  console.log(`🚀 Server & Socket.IO running on http://localhost:${PORT}`);
 });
