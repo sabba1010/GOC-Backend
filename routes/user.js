@@ -12,6 +12,10 @@ const {
   toggleSaveOpportunity,
   toggleApplyOpportunity,
   getAllSubmissions,
+  getUserReminders,
+  addReminder,
+  deleteReminder,
+  toggleReminder,
 } = require("../controllers/userController");
 
 const { protect, authorizeRoles } = require("../middleware/authMiddleware");
@@ -26,6 +30,12 @@ router.put("/me",        protect, updateMe);  // PUT  /api/users/me
 router.post("/logout",   protect, logoutUser);// POST /api/users/logout
 router.post("/save-opportunity/:id", protect, toggleSaveOpportunity);
 router.post("/apply-opportunity/:id", protect, toggleApplyOpportunity);
+
+// ── Reminders & Calendar ────────────────────────
+router.get("/reminders", protect, getUserReminders);
+router.post("/reminders", protect, addReminder);
+router.delete("/reminders/:id", protect, deleteReminder);
+router.put("/reminders/:id/toggle", protect, toggleReminder);
 
 // ── Admin ───────────────────────────────────────
 router.get("/",          protect, authorizeRoles("admin"), getAllUsers);

@@ -292,6 +292,107 @@ const getAllSubmissions = async (req, res) => {
   }
 };
 
+// ──────────────────────────────────────────────
+// @route   GET /api/users/reminders
+// @desc    Get user personal reminders & opportunity deadlines
+// @access  Private
+// ──────────────────────────────────────────────
+const getUserReminders = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id)
+      .populate("savedOpportunities")
+      .populate("appliedOpportunities");
+
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    res.status(200).json({
+      success: true,
+      reminders: user.reminders || [],
+      savedOpportunities: user.savedOpportunities || [],
+      appliedOpportunities: user.appliedOpportunities || [],
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+// ──────────────────────────────────────────────
+// @route   POST /api/users/reminders
+// @desc    Add a reminder
+// @access  Private
+// ──────────────────────────────────────────────
+const addReminder = async (req, res) => {
+  try {
+    const { title, date, opportunityId, type, notes } = req.body;
+
+    if (!title || !date) {
+      return res.status(400).json({ message: "Title and date are required" });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const newReminder = {
+      title,
+      date: new Date(date),
+      opportunityId: opportunityId || null,
+      type: type || "personal_reminder",
+      notes: notes || "",
+      isCompleted: false,
+    };
+
+    user.reminders.push(newReminder);
+    await user.save();
+
+    res.status(201).json({ success: true, reminders: user.reminders });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+// ──────────────────────────────────────────────
+// @route   DELETE /api/users/reminders/:id
+// @desc    Delete a reminder
+// @access  Private
+// ──────────────────────────────────────────────
+const deleteReminder = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    user.reminders = user.reminders.filter(
+      (r) => r._id.toString() !== req.params.id
+    );
+
+    await user.save();
+    res.status(200).json({ success: true, reminders: user.reminders });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+// ──────────────────────────────────────────────
+// @route   PUT /api/users/reminders/:id/toggle
+// @desc    Toggle reminder completion
+// @access  Private
+// ──────────────────────────────────────────────
+const toggleReminder = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const reminder = user.reminders.id(req.params.id);
+    if (!reminder) return res.status(404).json({ message: "Reminder not found" });
+
+    reminder.isCompleted = !reminder.isCompleted;
+    await user.save();
+
+    res.status(200).json({ success: true, reminders: user.reminders });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
 module.exports = {
   registerUser,
   loginUser,
@@ -303,4 +404,8 @@ module.exports = {
   toggleSaveOpportunity,
   toggleApplyOpportunity,
   getAllSubmissions,
+  getUserReminders,
+  addReminder,
+  deleteReminder,
+  toggleReminder,
 };

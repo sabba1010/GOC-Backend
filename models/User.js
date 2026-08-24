@@ -78,6 +78,21 @@ const userSchema = new mongoose.Schema(
         ref: "Opportunity",
       },
     ],
+    reminders: [
+      {
+        title: { type: String, required: true },
+        date: { type: Date, required: true },
+        opportunityId: { type: mongoose.Schema.Types.ObjectId, ref: "Opportunity" },
+        type: {
+          type: String,
+          enum: ["opportunity_deadline", "application_deadline", "saved_deadline", "personal_reminder"],
+          default: "personal_reminder",
+        },
+        notes: { type: String, default: "" },
+        isCompleted: { type: Boolean, default: false },
+        createdAt: { type: Date, default: Date.now },
+      },
+    ],
     chatMutedUntil: {
       type: Date,
       default: null,
