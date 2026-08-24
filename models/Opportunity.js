@@ -31,6 +31,10 @@ const opportunitySchema = new mongoose.Schema(
       type: String,
       required: [true, "Description is required"],
     },
+    pdfFile: {
+      type: String,
+      default: "",
+    },
     status: {
       type: String,
       enum: ["Published", "Draft", "Archived"],
