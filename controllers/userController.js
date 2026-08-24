@@ -230,14 +230,27 @@ const toggleApplyOpportunity = async (req, res) => {
     if (!user) return res.status(404).json({ message: "User not found" });
 
     const oppId = req.params.id;
-    const isApplied = user.appliedOpportunities.includes(oppId);
+    const { note } = req.body || {};
+    const isApplied = user.appliedOpportunities.some((id) => id.toString() === oppId);
 
     if (isApplied) {
       user.appliedOpportunities = user.appliedOpportunities.filter(
         (id) => id.toString() !== oppId
       );
+      if (user.applications) {
+        user.applications = user.applications.filter(
+          (app) => app.opportunity && app.opportunity.toString() !== oppId
+        );
+      }
     } else {
       user.appliedOpportunities.push(oppId);
+      if (!user.applications) user.applications = [];
+      user.applications.push({
+        opportunity: oppId,
+        status: "Pending",
+        note: note || "",
+        appliedAt: new Date(),
+      });
     }
 
     await user.save();
@@ -249,44 +262,132 @@ const toggleApplyOpportunity = async (req, res) => {
 
 // ──────────────────────────────────────────────
 // @route   GET /api/users/submissions
-// @desc    Get all student submissions
+// @desc    Get all student submissions for Admin review
 // @access  Private/Admin
 // ──────────────────────────────────────────────
 const getAllSubmissions = async (req, res) => {
   try {
     const users = await User.find({ 
       appliedOpportunities: { $exists: true, $not: { $size: 0 } } 
-    }).populate("appliedOpportunities").select("-password");
+    })
+    .populate("appliedOpportunities")
+    .populate("applications.opportunity")
+    .select("-password");
     
     let submissions = [];
     users.forEach(user => {
-      user.appliedOpportunities.forEach(opp => {
-        submissions.push({
-          id: `${user._id}_${opp._id}`,
-          user: {
-            id: user._id,
-            name: user.name,
-            email: user.email,
-            school: user.school,
-            certificates: user.certificates,
-            customFields: user.customFields,
-            avatar: user.avatar,
-            bio: user.bio,
-            username: user.username
-          },
-          opportunity: {
-            id: opp._id,
-            title: opp.title,
-            category: opp.category,
-            deadline: opp.deadline
-          },
-          status: "Pending", // Default status for now
-          appliedAt: user.updatedAt // Fallback date since we don't store timestamp per apply
+      if (user.applications && user.applications.length > 0) {
+        user.applications.forEach(app => {
+          if (app.opportunity) {
+            const opp = app.opportunity;
+            submissions.push({
+              id: `${user._id}_${opp._id}`,
+              userId: user._id,
+              opportunityId: opp._id,
+              user: {
+                id: user._id,
+                name: user.name,
+                email: user.email,
+                school: user.school,
+                certificates: user.certificates,
+                customFields: user.customFields,
+                avatar: user.avatar,
+                bio: user.bio,
+                username: user.username
+              },
+              opportunity: {
+                id: opp._id,
+                title: opp.title,
+                category: opp.category || "General",
+                organization: opp.organization || "",
+                deadline: opp.deadline || "No deadline specified",
+                image: opp.image || ""
+              },
+              status: app.status || "Pending",
+              note: app.note || "",
+              appliedAt: app.appliedAt || user.updatedAt
+            });
+          }
         });
-      });
+      } else if (user.appliedOpportunities && user.appliedOpportunities.length > 0) {
+        user.appliedOpportunities.forEach(opp => {
+          if (opp && opp._id) {
+            submissions.push({
+              id: `${user._id}_${opp._id}`,
+              userId: user._id,
+              opportunityId: opp._id,
+              user: {
+                id: user._id,
+                name: user.name,
+                email: user.email,
+                school: user.school,
+                certificates: user.certificates,
+                customFields: user.customFields,
+                avatar: user.avatar,
+                bio: user.bio,
+                username: user.username
+              },
+              opportunity: {
+                id: opp._id,
+                title: opp.title,
+                category: opp.category || "General",
+                organization: opp.organization || "",
+                deadline: opp.deadline || "No deadline specified",
+                image: opp.image || ""
+              },
+              status: "Pending",
+              note: "",
+              appliedAt: user.updatedAt
+            });
+          }
+        });
+      }
     });
     
     res.status(200).json({ success: true, submissions });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+// ──────────────────────────────────────────────
+// @route   PUT /api/users/submissions/status
+// @desc    Update submission status (Pending/Approved/Rejected)
+// @access  Private/Admin
+// ──────────────────────────────────────────────
+const updateSubmissionStatus = async (req, res) => {
+  try {
+    const { userId, opportunityId, status } = req.body;
+
+    if (!userId || !opportunityId || !status) {
+      return res.status(400).json({ message: "userId, opportunityId, and status are required" });
+    }
+
+    if (!["Pending", "Approved", "Rejected"].includes(status)) {
+      return res.status(400).json({ message: "Status must be Pending, Approved, or Rejected" });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    if (!user.applications) user.applications = [];
+
+    const existingAppIndex = user.applications.findIndex(
+      (app) => app.opportunity && app.opportunity.toString() === opportunityId
+    );
+
+    if (existingAppIndex > -1) {
+      user.applications[existingAppIndex].status = status;
+    } else {
+      user.applications.push({
+        opportunity: opportunityId,
+        status: status,
+        appliedAt: new Date(),
+      });
+    }
+
+    await user.save();
+    res.status(200).json({ success: true, message: `Submission status updated to ${status}` });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
   }
@@ -404,6 +505,7 @@ module.exports = {
   toggleSaveOpportunity,
   toggleApplyOpportunity,
   getAllSubmissions,
+  updateSubmissionStatus,
   getUserReminders,
   addReminder,
   deleteReminder,

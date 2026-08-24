@@ -78,6 +78,27 @@ const userSchema = new mongoose.Schema(
         ref: "Opportunity",
       },
     ],
+    applications: [
+      {
+        opportunity: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Opportunity",
+        },
+        status: {
+          type: String,
+          enum: ["Pending", "Approved", "Rejected"],
+          default: "Pending",
+        },
+        note: {
+          type: String,
+          default: "",
+        },
+        appliedAt: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
     reminders: [
       {
         title: { type: String, required: true },

@@ -12,6 +12,7 @@ const {
   toggleSaveOpportunity,
   toggleApplyOpportunity,
   getAllSubmissions,
+  updateSubmissionStatus,
   getUserReminders,
   addReminder,
   deleteReminder,
@@ -40,6 +41,7 @@ router.put("/reminders/:id/toggle", protect, toggleReminder);
 // ── Admin ───────────────────────────────────────
 router.get("/",          protect, authorizeRoles("admin"), getAllUsers);
 router.get("/submissions", protect, authorizeRoles("admin"), getAllSubmissions);
+router.put("/submissions/status", protect, authorizeRoles("admin"), updateSubmissionStatus);
 router.put("/:id/status", protect, authorizeRoles("admin"), updateUserStatus);
 
 module.exports = router;
