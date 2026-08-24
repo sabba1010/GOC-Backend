@@ -106,7 +106,7 @@ const userSchema = new mongoose.Schema(
         opportunityId: { type: mongoose.Schema.Types.ObjectId, ref: "Opportunity" },
         type: {
           type: String,
-          enum: ["opportunity_deadline", "application_deadline", "saved_deadline", "personal_reminder"],
+          enum: ["opportunity_deadline", "application_deadline", "saved_deadline", "personal_reminder", "application_status"],
           default: "personal_reminder",
         },
         notes: { type: String, default: "" },

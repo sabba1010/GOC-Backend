@@ -1,5 +1,6 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const Opportunity = require("../models/Opportunity");
 
 // ── Generate JWT ───────────────────────────────
 const generateToken = (id, role) => {
@@ -387,7 +388,48 @@ const updateSubmissionStatus = async (req, res) => {
       });
     }
 
+    // Fetch opportunity details for notification text
+    const opportunity = await Opportunity.findById(opportunityId);
+    const oppTitle = opportunity ? opportunity.title : "Opportunity";
+
+    let noteMessage = `Your application status for "${oppTitle}" has been updated to ${status}.`;
+    if (status === "Approved") {
+      noteMessage = `Congratulations! Your application for "${oppTitle}" has been Approved! 🎉`;
+    } else if (status === "Rejected") {
+      noteMessage = `Your application for "${oppTitle}" was updated to Rejected.`;
+    }
+
+    const notificationItem = {
+      title: `Application ${status}: ${oppTitle}`,
+      date: new Date(),
+      opportunityId: opportunityId,
+      type: "application_status",
+      notes: noteMessage,
+      isCompleted: false,
+    };
+
+    if (!user.reminders) user.reminders = [];
+    user.reminders.unshift(notificationItem);
+
     await user.save();
+
+    // Emit real-time Socket notification to user
+    try {
+      const { getIO } = require("../socket/chatSocket");
+      const io = getIO();
+      if (io) {
+        io.to(`user_${user._id.toString()}`).emit("notification:new", {
+          title: notificationItem.title,
+          status: status,
+          opportunityTitle: oppTitle,
+          notes: noteMessage,
+          createdAt: new Date(),
+        });
+      }
+    } catch (socketErr) {
+      console.error("Socket emit notification error:", socketErr);
+    }
+
     res.status(200).json({ success: true, message: `Submission status updated to ${status}` });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
