@@ -1,6 +1,4 @@
 const Resource = require("../models/Resource");
-const path = require("path");
-const fs = require("fs");
 
 // @desc    Create a new resource (Admin only)
 // @route   POST /api/resources
@@ -26,14 +24,16 @@ const createResource = async (req, res) => {
     let pdfUrl = "";
     let pdfOriginalName = "";
 
-    // Handle uploaded files
+    // Convert uploaded memory files to Base64 Data URLs
     if (req.files) {
       if (req.files.image && req.files.image[0]) {
-        imageUrl = `/uploads/${req.files.image[0].filename}`;
+        const file = req.files.image[0];
+        imageUrl = `data:${file.mimetype};base64,${file.buffer.toString("base64")}`;
       }
       if (req.files.pdf && req.files.pdf[0]) {
-        pdfUrl = `/uploads/${req.files.pdf[0].filename}`;
-        pdfOriginalName = req.files.pdf[0].originalname;
+        const file = req.files.pdf[0];
+        pdfUrl = `data:${file.mimetype};base64,${file.buffer.toString("base64")}`;
+        pdfOriginalName = file.originalname;
       }
     }
 
@@ -99,19 +99,8 @@ const deleteResource = async (req, res) => {
       return res.status(404).json({ message: "Resource not found" });
     }
 
-    // Delete associated files
-    const deleteFile = (filePath) => {
-      if (filePath) {
-        const fullPath = path.join(__dirname, "..", filePath);
-        if (fs.existsSync(fullPath)) {
-          fs.unlinkSync(fullPath);
-        }
-      }
-    };
-
-    deleteFile(resource.image);
-    deleteFile(resource.pdfFile);
-
+    // Since image and pdf are stored directly in MongoDB as Base64 Data URLs,
+    // deleting the document automatically removes them from database.
     await resource.deleteOne();
     res.status(200).json({ success: true, message: "Resource deleted" });
   } catch (error) {
