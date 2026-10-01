@@ -70,6 +70,18 @@ const liveChatMessageSchema = new mongoose.Schema(
       ref: "Opportunity",
       default: null,
     },
+    attachmentUrl: {
+      type: String,
+      default: "",
+    },
+    attachmentType: {
+      type: String,
+      default: "",
+    },
+    attachmentName: {
+      type: String,
+      default: "",
+    },
     mentions: [
       {
         type: mongoose.Schema.Types.ObjectId,

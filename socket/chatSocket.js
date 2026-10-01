@@ -7,6 +7,8 @@ const ChatReport = require("../models/ChatReport");
 const Opportunity = require("../models/Opportunity");
 const { validateUserCanPost, evaluateMessageSpam } = require("../services/chatModeration");
 
+const UserBlock = require("../models/UserBlock");
+
 let ioInstance = null;
 
 const initGlobalRoom = async () => {
@@ -19,6 +21,27 @@ const initGlobalRoom = async () => {
       });
       console.log("🌸 Global Chat Room created in DB:", globalRoom._id);
     }
+
+    const defaultCircles = [
+      { name: "STEM Squad", description: "For future engineers & scientists", icon: "🔬" },
+      { name: "First-Gen Founders", description: "First-generation college-bound students", icon: "🌱" },
+      { name: "Leadership & Career", description: "Networking & professional development", icon: "💼" },
+      { name: "Arts & Creative", description: "Design, writing, and creative arts", icon: "🎨" },
+    ];
+
+    for (const c of defaultCircles) {
+      const exists = await ChatRoom.findOne({ name: c.name, type: "circle" });
+      if (!exists) {
+        await ChatRoom.create({
+          name: c.name,
+          type: "circle",
+          description: c.description,
+          icon: c.icon,
+        });
+        console.log(`🌸 Circle created in DB: ${c.name}`);
+      }
+    }
+
     return globalRoom;
   } catch (err) {
     console.error("Error initializing global chat room:", err);
@@ -70,11 +93,11 @@ const setupChatSocket = (io) => {
     console.log(`💬 User connected to Chat Socket: ${user.name} (@${user.username})`);
 
     const globalRoom = await ChatRoom.findOne({ type: "global" });
-    const roomId = globalRoom ? globalRoom._id.toString() : "global";
+    const globalRoomId = globalRoom ? globalRoom._id.toString() : "global";
 
-    // Auto-join global chat room channel
-    socket.join(roomId);
-    socket.join(`user_${user._id}`);
+    // Auto-join global chat room channel and personal user notification channel
+    socket.join(globalRoomId);
+    socket.join(`user_${user._id.toString()}`);
 
     // Send initial room status to connected user
     if (globalRoom) {
@@ -82,22 +105,81 @@ const setupChatSocket = (io) => {
     }
 
     // ── EVENT: chat:join ─────────────────────────
-    socket.on("chat:join", () => {
-      socket.join(roomId);
+    socket.on("chat:join", async (payload) => {
+      try {
+        const targetId = typeof payload === "string" ? payload : payload?.roomId;
+        if (!targetId) {
+          socket.join(globalRoomId);
+          return;
+        }
+
+        const room = await ChatRoom.findById(targetId);
+        if (!room) return;
+
+        if (room.type === "direct") {
+          const isParticipant = room.participants.some((p) => p.toString() === user._id.toString());
+          if (!isParticipant && user.role !== "admin") {
+            socket.emit("chat:error", { message: "Not authorized to join this private conversation" });
+            return;
+          }
+        }
+
+        socket.join(room._id.toString());
+        socket.emit("chat:room:update", room);
+      } catch (err) {
+        console.error("Error joining chat room:", err);
+      }
     });
 
     // ── EVENT: chat:send ─────────────────────────
     socket.on("chat:send", async (data, callback) => {
       try {
-        const { content, replyToId, linkedOpportunityId, mentions } = data || {};
+        const { content, replyToId, linkedOpportunityId, mentions, attachmentUrl, attachmentType, attachmentName, roomId: payloadRoomId } = data || {};
 
-        if ((!content || !content.trim()) && !linkedOpportunityId) {
-          if (typeof callback === "function") callback({ error: "Message content or opportunity is required" });
+        let targetRoom = null;
+        if (payloadRoomId) {
+          targetRoom = await ChatRoom.findById(payloadRoomId);
+        } else {
+          targetRoom = await ChatRoom.findOne({ type: "global" });
+        }
+
+        if (!targetRoom) {
+          if (typeof callback === "function") callback({ error: "Chat room not found" });
           return;
         }
 
+        const currentRoomId = targetRoom._id.toString();
+
+        if ((!content || !content.trim()) && !linkedOpportunityId && !attachmentUrl) {
+          if (typeof callback === "function") callback({ error: "Message content, opportunity, or attachment is required" });
+          return;
+        }
+
+        // Direct room verification & blocking check
+        if (targetRoom.type === "direct") {
+          const isParticipant = targetRoom.participants.some((p) => p.toString() === user._id.toString());
+          if (!isParticipant && user.role !== "admin") {
+            if (typeof callback === "function") callback({ error: "Not authorized to post in this private conversation" });
+            return;
+          }
+
+          const recipientId = targetRoom.participants.find((p) => p.toString() !== user._id.toString());
+          if (recipientId) {
+            const isBlocked = await UserBlock.findOne({
+              $or: [
+                { blockerId: user._id, blockedUserId: recipientId },
+                { blockerId: recipientId, blockedUserId: user._id },
+              ],
+            });
+            if (isBlocked) {
+              if (typeof callback === "function") callback({ error: "Cannot send message due to privacy/blocking settings" });
+              return;
+            }
+          }
+        }
+
         // 1. Validate restrictions/mute/slow mode/room paused
-        const check = await validateUserCanPost(user._id, roomId);
+        const check = await validateUserCanPost(user._id, currentRoomId);
         if (!check.allowed) {
           if (typeof callback === "function") callback({ error: check.reason, remainingSeconds: check.remainingSeconds });
           socket.emit("chat:error", { message: check.reason, remainingSeconds: check.remainingSeconds });
@@ -105,7 +187,7 @@ const setupChatSocket = (io) => {
         }
 
         // 2. Evaluate Spam / Keyword Flags
-        const spamEval = await evaluateMessageSpam(user._id, roomId, content);
+        const spamEval = await evaluateMessageSpam(user._id, currentRoomId, content);
 
         // 3. Verify Opportunity if provided
         let opportunityRef = null;
@@ -128,12 +210,15 @@ const setupChatSocket = (io) => {
 
         // 5. Create Message in Database
         const newMsg = await LiveChatMessage.create({
-          roomId,
+          roomId: currentRoomId,
           senderId: user._id,
           displayNameSnapshot: user.name,
           content: content ? content.trim() : "",
           replyToId: replyRef,
           linkedOpportunityId: opportunityRef,
+          attachmentUrl: attachmentUrl || "",
+          attachmentType: attachmentType || "",
+          attachmentName: attachmentName || "",
           mentions: Array.isArray(mentions) ? mentions : [],
           moderationStatus: spamEval.isFlagged ? "flagged" : "clean",
           moderationFlags: spamEval.flags,
@@ -151,7 +236,26 @@ const setupChatSocket = (io) => {
           .populate("mentions", "name username");
 
         // 7. Broadcast new message to room
-        io.to(roomId).emit("chat:new", populatedMsg);
+        io.to(currentRoomId).emit("chat:new", populatedMsg);
+
+        // 8. Direct message real-time dispatch to recipient's socket room
+        if (targetRoom.type === "direct") {
+          const recipientId = targetRoom.participants.find((p) => p.toString() !== user._id.toString());
+          if (recipientId) {
+            io.to(`user_${recipientId.toString()}`).emit("chat:new", populatedMsg);
+
+            const recipientUser = await User.findById(recipientId);
+            const isMuted = recipientUser && recipientUser.chatMuteNotificationsUntil && recipientUser.chatMuteNotificationsUntil > new Date();
+            if (!isMuted) {
+              io.to(`user_${recipientId.toString()}`).emit("notification:new", {
+                title: `New message from ${user.name}`,
+                notes: content ? (content.length > 50 ? content.substring(0, 50) + "..." : content) : "Sent an attachment",
+                type: "chat_dm",
+                roomId: targetRoom._id,
+              });
+            }
+          }
+        }
 
         if (typeof callback === "function") callback({ success: true, message: populatedMsg });
       } catch (err) {

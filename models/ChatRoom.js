@@ -9,8 +9,27 @@ const chatRoomSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ["global"],
+      enum: ["global", "direct", "circle"],
       default: "global",
+    },
+    participants: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+    description: {
+      type: String,
+      default: "",
+    },
+    icon: {
+      type: String,
+      default: "",
+    },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
     },
     slowModeEnabled: {
       type: Boolean,

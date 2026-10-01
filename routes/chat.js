@@ -4,6 +4,10 @@ const { protect } = require("../middleware/authMiddleware");
 
 const {
   getMessages,
+  getConversations,
+  startDirectConversation,
+  getCircles,
+  toggleJoinCircle,
   sendMessage,
   deleteOwnMessage,
   toggleReaction,
@@ -19,7 +23,13 @@ const {
 // All student chat endpoints require valid user authentication
 router.use(protect);
 
+router.get("/conversations", getConversations);
+router.post("/conversations/direct", startDirectConversation);
+router.get("/circles", getCircles);
+router.post("/circles/:id/join", toggleJoinCircle);
+
 router.get("/rooms/global/messages", getMessages);
+router.get("/rooms/:roomId/messages", getMessages);
 router.post("/messages", sendMessage);
 router.delete("/messages/:id", deleteOwnMessage);
 
