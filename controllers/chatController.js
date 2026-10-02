@@ -290,6 +290,72 @@ const toggleJoinCircle = async (req, res) => {
   }
 };
 
+// @desc    Create a new community circle (Admin / Mentors / Community Builders)
+// @route   POST /api/chat/circles
+// @access  Private
+const createCircle = async (req, res) => {
+  try {
+    const { name, description, icon } = req.body;
+    if (!name || !name.trim()) {
+      return res.status(400).json({ message: "Circle name is required" });
+    }
+
+    const existing = await ChatRoom.findOne({ name: name.trim(), type: "circle" });
+    if (existing) {
+      return res.status(400).json({ message: "A community circle with this name already exists" });
+    }
+
+    const newCircle = await ChatRoom.create({
+      name: name.trim(),
+      description: description ? description.trim() : "",
+      icon: icon || "💬",
+      type: "circle",
+      createdBy: req.user._id,
+      participants: [req.user._id],
+    });
+
+    res.status(201).json({
+      _id: newCircle._id,
+      roomId: newCircle._id,
+      name: newCircle.name,
+      description: newCircle.description,
+      icon: newCircle.icon,
+      type: "circle",
+      membersCount: 1,
+      isMember: true,
+    });
+  } catch (err) {
+    console.error("Error creating circle:", err);
+    res.status(500).json({ message: "Server error creating community circle" });
+  }
+};
+
+// @desc    Delete a community circle (Admin / Creator)
+// @route   DELETE /api/chat/circles/:id
+// @access  Private
+const deleteCircle = async (req, res) => {
+  try {
+    const circleId = req.params.id;
+    const circle = await ChatRoom.findOne({ _id: circleId, type: "circle" });
+
+    if (!circle) {
+      return res.status(404).json({ message: "Community circle not found" });
+    }
+
+    if (req.user.role !== "admin" && circle.createdBy && circle.createdBy.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: "Not authorized to delete this circle" });
+    }
+
+    await LiveChatMessage.deleteMany({ roomId: circle._id });
+    await ChatRoom.findByIdAndDelete(circle._id);
+
+    res.json({ message: "Community circle deleted successfully", circleId: circle._id });
+  } catch (err) {
+    console.error("Error deleting circle:", err);
+    res.status(500).json({ message: "Server error deleting circle" });
+  }
+};
+
 // @desc    Send a new message (REST endpoint)
 // @route   POST /api/chat/messages
 // @access  Private
@@ -746,6 +812,8 @@ module.exports = {
   startDirectConversation,
   getCircles,
   toggleJoinCircle,
+  createCircle,
+  deleteCircle,
   sendMessage,
   deleteOwnMessage,
   toggleReaction,

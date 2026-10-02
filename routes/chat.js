@@ -8,6 +8,8 @@ const {
   startDirectConversation,
   getCircles,
   toggleJoinCircle,
+  createCircle,
+  deleteCircle,
   sendMessage,
   deleteOwnMessage,
   toggleReaction,
@@ -26,6 +28,8 @@ router.use(protect);
 router.get("/conversations", getConversations);
 router.post("/conversations/direct", startDirectConversation);
 router.get("/circles", getCircles);
+router.post("/circles", createCircle);
+router.delete("/circles/:id", deleteCircle);
 router.post("/circles/:id/join", toggleJoinCircle);
 
 router.get("/rooms/global/messages", getMessages);
