@@ -1,4 +1,5 @@
 const jwt = require("jsonwebtoken");
+const mongoose = require("mongoose");
 const User = require("../models/User");
 const ChatRoom = require("../models/ChatRoom");
 const LiveChatMessage = require("../models/LiveChatMessage");
@@ -108,24 +109,29 @@ const setupChatSocket = (io) => {
     socket.on("chat:join", async (payload) => {
       try {
         const targetId = typeof payload === "string" ? payload : payload?.roomId;
-        if (!targetId) {
-          socket.join(globalRoomId);
-          return;
+        let room = null;
+        if (!targetId || targetId === "global") {
+          room = await ChatRoom.findOne({ type: "global" });
+        } else if (mongoose.Types.ObjectId.isValid(targetId)) {
+          room = await ChatRoom.findById(targetId);
         }
 
-        const room = await ChatRoom.findById(targetId);
-        if (!room) return;
+        if (!room) {
+          room = await ChatRoom.findOne({ type: "global" });
+        }
 
-        if (room.type === "direct") {
-          const isParticipant = room.participants.some((p) => p.toString() === user._id.toString());
-          if (!isParticipant && user.role !== "admin") {
-            socket.emit("chat:error", { message: "Not authorized to join this private conversation" });
-            return;
+        if (room) {
+          if (room.type === "direct") {
+            const isParticipant = room.participants.some((p) => p.toString() === user._id.toString());
+            if (!isParticipant && user.role !== "admin") {
+              socket.emit("chat:error", { message: "Not authorized to join this private conversation" });
+              return;
+            }
           }
-        }
 
-        socket.join(room._id.toString());
-        socket.emit("chat:room:update", room);
+          socket.join(room._id.toString());
+          socket.emit("chat:room:update", room);
+        }
       } catch (err) {
         console.error("Error joining chat room:", err);
       }
@@ -137,7 +143,7 @@ const setupChatSocket = (io) => {
         const { content, replyToId, linkedOpportunityId, mentions, attachmentUrl, attachmentType, attachmentName, roomId: payloadRoomId } = data || {};
 
         let targetRoom = null;
-        if (payloadRoomId) {
+        if (payloadRoomId && payloadRoomId !== "global" && mongoose.Types.ObjectId.isValid(payloadRoomId)) {
           targetRoom = await ChatRoom.findById(payloadRoomId);
         } else {
           targetRoom = await ChatRoom.findOne({ type: "global" });

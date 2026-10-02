@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const LiveChatMessage = require("../models/LiveChatMessage");
 const ChatRoom = require("../models/ChatRoom");
 const ChatReadState = require("../models/ChatReadState");
@@ -300,13 +301,18 @@ const createCircle = async (req, res) => {
       return res.status(400).json({ message: "Circle name is required" });
     }
 
-    const existing = await ChatRoom.findOne({ name: name.trim(), type: "circle" });
+    const trimmedName = name.trim();
+    const existing = await ChatRoom.findOne({
+      name: { $regex: new RegExp(`^${trimmedName}$`, "i") },
+      type: "circle",
+    });
+
     if (existing) {
       return res.status(400).json({ message: "A community circle with this name already exists" });
     }
 
     const newCircle = await ChatRoom.create({
-      name: name.trim(),
+      name: trimmedName,
       description: description ? description.trim() : "",
       icon: icon || "💬",
       type: "circle",
@@ -314,19 +320,27 @@ const createCircle = async (req, res) => {
       participants: [req.user._id],
     });
 
-    res.status(201).json({
-      _id: newCircle._id,
-      roomId: newCircle._id,
+    const formattedCircle = {
+      _id: newCircle._id.toString(),
+      roomId: newCircle._id.toString(),
       name: newCircle.name,
       description: newCircle.description,
       icon: newCircle.icon,
       type: "circle",
       membersCount: 1,
       isMember: true,
-    });
+      createdBy: newCircle.createdBy,
+    };
+
+    const io = getIO();
+    if (io) {
+      io.emit("circle:created", formattedCircle);
+    }
+
+    return res.status(201).json(formattedCircle);
   } catch (err) {
     console.error("Error creating circle:", err);
-    res.status(500).json({ message: "Server error creating community circle" });
+    return res.status(500).json({ message: "Server error creating community circle", error: err.message });
   }
 };
 
@@ -336,23 +350,34 @@ const createCircle = async (req, res) => {
 const deleteCircle = async (req, res) => {
   try {
     const circleId = req.params.id;
-    const circle = await ChatRoom.findOne({ _id: circleId, type: "circle" });
+    if (!circleId || !mongoose.Types.ObjectId.isValid(circleId)) {
+      return res.status(400).json({ message: "Invalid Circle ID format" });
+    }
 
+    const circle = await ChatRoom.findById(circleId);
     if (!circle) {
       return res.status(404).json({ message: "Community circle not found" });
     }
 
-    if (req.user.role !== "admin" && circle.createdBy && circle.createdBy.toString() !== req.user._id.toString()) {
+    const isAdmin = req.user.role === "admin";
+    const isCreator = circle.createdBy && circle.createdBy.toString() === req.user._id.toString();
+
+    if (!isAdmin && !isCreator) {
       return res.status(403).json({ message: "Not authorized to delete this circle" });
     }
 
     await LiveChatMessage.deleteMany({ roomId: circle._id });
     await ChatRoom.findByIdAndDelete(circle._id);
 
-    res.json({ message: "Community circle deleted successfully", circleId: circle._id });
+    const io = getIO();
+    if (io) {
+      io.emit("circle:deleted", { circleId: circle._id.toString() });
+    }
+
+    return res.status(200).json({ success: true, message: "Community circle deleted successfully", circleId: circle._id.toString() });
   } catch (err) {
     console.error("Error deleting circle:", err);
-    res.status(500).json({ message: "Server error deleting circle" });
+    return res.status(500).json({ message: "Server error deleting circle", error: err.message });
   }
 };
 
@@ -364,7 +389,7 @@ const sendMessage = async (req, res) => {
     const { content, replyToId, linkedOpportunityId, mentions, attachmentUrl, attachmentType, attachmentName, roomId: bodyRoomId } = req.body;
 
     let targetRoom = null;
-    if (bodyRoomId) {
+    if (bodyRoomId && bodyRoomId !== "global" && mongoose.Types.ObjectId.isValid(bodyRoomId)) {
       targetRoom = await ChatRoom.findById(bodyRoomId);
     } else {
       targetRoom = await ChatRoom.findOne({ type: "global" });
