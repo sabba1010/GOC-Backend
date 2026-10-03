@@ -360,7 +360,7 @@ const deleteCircle = async (req, res) => {
     }
 
     const isAdmin = req.user.role === "admin";
-    const isCreator = circle.createdBy && circle.createdBy.toString() === req.user._id.toString();
+    const isCreator = !circle.createdBy || (circle.createdBy && circle.createdBy.toString() === req.user._id.toString());
 
     if (!isAdmin && !isCreator) {
       return res.status(403).json({ message: "Not authorized to delete this circle" });
@@ -831,6 +831,27 @@ const searchUsersForMention = async (req, res) => {
   }
 };
 
+// @desc    Get real mentors/members list from database
+// @route   GET /api/chat/mentors
+// @access  Private
+const getMentors = async (req, res) => {
+  try {
+    let mentors = await User.find({ role: "mentor", status: "Active" })
+      .select("name username avatar role school bio tags rating")
+      .limit(20);
+
+    if (!mentors || mentors.length === 0) {
+      mentors = await User.find({ _id: { $ne: req.user._id }, status: "Active" })
+        .select("name username avatar role school bio tags rating")
+        .limit(10);
+    }
+
+    res.json(mentors || []);
+  } catch (err) {
+    res.status(500).json({ message: "Error fetching mentors" });
+  }
+};
+
 module.exports = {
   getMessages,
   getConversations,
@@ -849,4 +870,5 @@ module.exports = {
   updateReadState,
   updateMuteNotifications,
   searchUsersForMention,
+  getMentors,
 };

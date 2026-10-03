@@ -20,6 +20,7 @@ const {
   updateReadState,
   updateMuteNotifications,
   searchUsersForMention,
+  getMentors,
 } = require("../controllers/chatController");
 
 // All student chat endpoints require valid user authentication
@@ -31,6 +32,7 @@ router.get("/circles", getCircles);
 router.post("/circles", createCircle);
 router.delete("/circles/:id", deleteCircle);
 router.post("/circles/:id/join", toggleJoinCircle);
+router.get("/mentors", getMentors);
 
 router.get("/rooms/global/messages", getMessages);
 router.get("/rooms/:roomId/messages", getMessages);

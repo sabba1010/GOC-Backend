@@ -23,26 +23,6 @@ const initGlobalRoom = async () => {
       console.log("🌸 Global Chat Room created in DB:", globalRoom._id);
     }
 
-    const defaultCircles = [
-      { name: "STEM Squad", description: "For future engineers & scientists", icon: "🔬" },
-      { name: "First-Gen Founders", description: "First-generation college-bound students", icon: "🌱" },
-      { name: "Leadership & Career", description: "Networking & professional development", icon: "💼" },
-      { name: "Arts & Creative", description: "Design, writing, and creative arts", icon: "🎨" },
-    ];
-
-    for (const c of defaultCircles) {
-      const exists = await ChatRoom.findOne({ name: c.name, type: "circle" });
-      if (!exists) {
-        await ChatRoom.create({
-          name: c.name,
-          type: "circle",
-          description: c.description,
-          icon: c.icon,
-        });
-        console.log(`🌸 Circle created in DB: ${c.name}`);
-      }
-    }
-
     return globalRoom;
   } catch (err) {
     console.error("Error initializing global chat room:", err);
