@@ -130,9 +130,48 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    // Stripe Subscription Fields
+    stripeCustomerId: {
+      type: String,
+      default: "",
+    },
+    stripeSubscriptionId: {
+      type: String,
+      default: "",
+    },
+    subscriptionPlan: {
+      type: String,
+      enum: ["monthly", "yearly", "none"],
+      default: "none",
+    },
+    subscriptionStatus: {
+      type: String,
+      enum: ["active", "trialing", "past_due", "canceled", "unpaid", "incomplete", "inactive"],
+      default: "inactive",
+    },
+    currentPeriodStart: {
+      type: Date,
+      default: null,
+    },
+    currentPeriodEnd: {
+      type: Date,
+      default: null,
+    },
+    cancelAtPeriodEnd: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true }
 );
+
+// Method to check if user has active resource dashboard access
+userSchema.methods.hasResourceAccess = function () {
+  if (this.role === "admin" || this.role === "mentor") return true;
+  if (this.subscriptionStatus === "active" || this.subscriptionStatus === "trialing") return true;
+  if (this.currentPeriodEnd && new Date(this.currentPeriodEnd) > new Date()) return true;
+  return false;
+};
 
 // Hash password before saving
 userSchema.pre("save", async function (next) {
