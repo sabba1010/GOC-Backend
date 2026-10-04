@@ -102,7 +102,9 @@ const getMe = async (req, res) => {
       .populate("appliedOpportunities")
       .populate("applications.opportunity");
     if (!user) return res.status(404).json({ message: "User not found" });
-    res.status(200).json({ success: true, user });
+    const userObj = user.toObject();
+    userObj.hasResourceAccess = user.hasResourceAccess();
+    res.status(200).json({ success: true, user: userObj });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
   }

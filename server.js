@@ -31,6 +31,9 @@ app.use(cors({
   },
   credentials: true,
 }));
+// ── Stripe Webhook (Raw Body Parser before express.json) ──────
+app.post("/api/subscription/webhook", express.raw({ type: "application/json" }), require("./controllers/subscriptionController").handleWebhook);
+
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
@@ -75,6 +78,7 @@ app.use("/api/upload", require("./routes/upload"));
 app.use("/api/resources", require("./routes/resource"));
 app.use("/api/chat", require("./routes/chat"));
 app.use("/api/admin/chat", require("./routes/adminChat"));
+app.use("/api/subscription", require("./routes/subscription"));
 
 // ── Serve Static Files ─────────────────────────────────────
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));

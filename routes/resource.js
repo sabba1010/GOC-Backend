@@ -4,6 +4,7 @@ const multer = require("multer");
 const path = require("path");
 
 const { protect, authorizeRoles } = require("../middleware/authMiddleware");
+const { requireSubscription } = require("../middleware/subscriptionMiddleware");
 const {
   createResource,
   getResources,
@@ -36,8 +37,8 @@ const uploadFields = upload.fields([
   { name: "pdf", maxCount: 1 },
 ]);
 
-// @route   GET /api/resources          — Public (published)
-router.get("/", protect, getResources);
+// @route   GET /api/resources          — Protected (Requires Active Subscription)
+router.get("/", protect, requireSubscription, getResources);
 
 // @route   GET /api/resources/admin    — Admin all
 router.get("/admin", protect, authorizeRoles("admin"), getAllResourcesAdmin);
