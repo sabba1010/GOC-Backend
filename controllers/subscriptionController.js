@@ -71,6 +71,114 @@ const updatePricing = async (req, res) => {
   }
 };
 
+// @desc    Get subscription revenue & package statistics (Admin only)
+// @route   GET /api/subscription/admin/stats
+// @access  Private/Admin
+const getAdminStats = async (req, res) => {
+  try {
+    const setting = await Setting.findOne({ key: "subscription_pricing" });
+    const monthlyRate = setting?.monthlyPrice || 8;
+    const yearlyRate = setting?.yearlyPrice || 12;
+
+    // 1. Database user subscriber metrics
+    const users = await User.find().select(
+      "name email role subscriptionPlan subscriptionStatus currentPeriodStart currentPeriodEnd createdAt"
+    );
+
+    let activeMonthlyCount = 0;
+    let activeYearlyCount = 0;
+    let inactiveCount = 0;
+
+    users.forEach((u) => {
+      if (u.role === "admin") return;
+      const isSubscribed =
+        u.subscriptionStatus === "active" ||
+        u.subscriptionStatus === "trialing" ||
+        (u.currentPeriodEnd && new Date(u.currentPeriodEnd) > new Date());
+
+      if (isSubscribed) {
+        if (u.subscriptionPlan === "yearly") {
+          activeYearlyCount++;
+        } else {
+          activeMonthlyCount++;
+        }
+      } else {
+        inactiveCount++;
+      }
+    });
+
+    const totalActiveSubscribers = activeMonthlyCount + activeYearlyCount;
+
+    // 2. Stripe Invoices & Realized Revenue
+    let totalRevenue = 0;
+    let monthlyRevenue = 0;
+    let yearlyRevenue = 0;
+    let recentTransactions = [];
+
+    try {
+      const stripe = getStripe();
+      const invoices = await stripe.invoices.list({ limit: 100 });
+
+      invoices.data.forEach((inv) => {
+        if (inv.status === "paid" && inv.amount_paid > 0) {
+          const amount = inv.amount_paid / 100;
+          totalRevenue += amount;
+
+          const lineItem = inv.lines?.data?.[0];
+          const desc = (lineItem?.description || "").toLowerCase();
+          const interval = lineItem?.plan?.interval || lineItem?.price?.recurring?.interval;
+
+          let planType = "monthly";
+          if (desc.includes("yearly") || desc.includes("year") || interval === "year" || amount >= yearlyRate) {
+            planType = "yearly";
+            yearlyRevenue += amount;
+          } else {
+            planType = "monthly";
+            monthlyRevenue += amount;
+          }
+
+          recentTransactions.push({
+            id: inv.id,
+            customerEmail: inv.customer_email || inv.customer_name || "Customer",
+            amount,
+            currency: (inv.currency || "usd").toUpperCase(),
+            plan: planType,
+            date: new Date(inv.created * 1000).toISOString(),
+            status: "Paid",
+            hostedInvoiceUrl: inv.hosted_invoice_url,
+          });
+        }
+      });
+    } catch (stripeErr) {
+      console.warn("Could not fetch Stripe invoices, falling back to database estimates:", stripeErr.message);
+      monthlyRevenue = activeMonthlyCount * monthlyRate;
+      yearlyRevenue = activeYearlyCount * yearlyRate;
+      totalRevenue = monthlyRevenue + yearlyRevenue;
+    }
+
+    res.status(200).json({
+      success: true,
+      stats: {
+        totalRevenue: Number(totalRevenue.toFixed(2)),
+        monthlyRevenue: Number(monthlyRevenue.toFixed(2)),
+        yearlyRevenue: Number(yearlyRevenue.toFixed(2)),
+        activeMonthlyCount,
+        activeYearlyCount,
+        totalActiveSubscribers,
+        inactiveCount,
+        rates: {
+          monthly: monthlyRate,
+          yearly: yearlyRate,
+        },
+        recentTransactions: recentTransactions.slice(0, 10),
+      },
+    });
+  } catch (error) {
+    console.error("Admin Subscription Stats Error:", error);
+    res.status(500).json({ message: "Failed to fetch subscription statistics", error: error.message });
+  }
+};
+
 // @desc    Get current user's subscription status
 // @route   GET /api/subscription/status
 // @access  Private
@@ -440,6 +548,7 @@ async function syncUserSubscription(userId, customerId, subscription, fallbackPl
 module.exports = {
   getPricing,
   updatePricing,
+  getAdminStats,
   getStatus,
   createCheckoutSession,
   verifySession,

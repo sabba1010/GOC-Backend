@@ -4,6 +4,7 @@ const { protect, authorizeRoles } = require("../middleware/authMiddleware");
 const {
   getPricing,
   updatePricing,
+  getAdminStats,
   getStatus,
   createCheckoutSession,
   verifySession,
@@ -15,8 +16,9 @@ const {
 // Public / Authenticated Pricing route
 router.get("/pricing", getPricing);
 
-// Admin-only Pricing update route
+// Admin-only Pricing & Stats routes
 router.put("/admin/pricing", protect, authorizeRoles("admin"), updatePricing);
+router.get("/admin/stats", protect, authorizeRoles("admin"), getAdminStats);
 
 // User Subscription routes (Protected)
 router.get("/status", protect, getStatus);
