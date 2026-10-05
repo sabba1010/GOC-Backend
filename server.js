@@ -1,3 +1,13 @@
+const dns = require("dns");
+try {
+  dns.setServers(["8.8.8.8", "1.1.1.1", "8.8.4.4"]);
+  if (dns.setDefaultResultOrder) {
+    dns.setDefaultResultOrder("ipv4first");
+  }
+} catch (e) {
+  console.warn("DNS override note:", e.message);
+}
+
 require("dotenv").config();
 const express = require("express");
 const path = require("path");
