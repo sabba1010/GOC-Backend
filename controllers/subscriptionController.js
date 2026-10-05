@@ -122,8 +122,8 @@ const createCheckoutSession = async (req, res) => {
 
     // Origin header or default frontend URL
     const clientUrl = req.headers.origin || "http://localhost:5173";
-    const successUrl = `${clientUrl}/dashboard/student/resources?session_id={CHECKOUT_SESSION_ID}&success=true`;
-    const cancelUrl = `${clientUrl}/dashboard/student/resources?canceled=true`;
+    const successUrl = `${clientUrl}/dashboard?session_id={CHECKOUT_SESSION_ID}&success=true`;
+    const cancelUrl = `${clientUrl}/dashboard?canceled=true`;
 
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
@@ -155,6 +155,51 @@ const createCheckoutSession = async (req, res) => {
   }
 };
 
+// @desc    Verify and sync checkout session after returning from Stripe
+// @route   GET /api/subscription/verify-session
+// @access  Private
+const verifySession = async (req, res) => {
+  try {
+    const { session_id } = req.query;
+    if (!session_id) {
+      return res.status(400).json({ message: "Session ID is required." });
+    }
+
+    const stripe = getStripe();
+    const session = await stripe.checkout.sessions.retrieve(session_id);
+
+    if (session && session.payment_status === "paid") {
+      const userId = session.metadata?.userId || req.user._id.toString();
+      const plan = session.metadata?.plan || "monthly";
+      const customerId = session.customer;
+      const subscriptionId = session.subscription;
+
+      if (subscriptionId) {
+        const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+        await syncUserSubscription(userId, customerId, subscription, plan);
+      }
+    }
+
+    const updatedUser = await User.findById(req.user._id);
+    res.status(200).json({
+      success: true,
+      subscription: {
+        hasAccess: updatedUser.hasResourceAccess(),
+        subscriptionPlan: updatedUser.subscriptionPlan,
+        subscriptionStatus: updatedUser.subscriptionStatus,
+        currentPeriodStart: updatedUser.currentPeriodStart,
+        currentPeriodEnd: updatedUser.currentPeriodEnd,
+        cancelAtPeriodEnd: updatedUser.cancelAtPeriodEnd,
+        stripeCustomerId: updatedUser.stripeCustomerId,
+        role: updatedUser.role,
+      },
+    });
+  } catch (error) {
+    console.error("Verify Session Error:", error);
+    res.status(500).json({ message: "Failed to verify session", error: error.message });
+  }
+};
+
 // @desc    Create Stripe Billing Customer Portal Session
 // @route   POST /api/subscription/create-portal-session
 // @access  Private
@@ -171,7 +216,7 @@ const createPortalSession = async (req, res) => {
 
     const stripe = getStripe();
     const clientUrl = req.headers.origin || "http://localhost:5173";
-    const returnUrl = `${clientUrl}/dashboard/student/resources`;
+    const returnUrl = `${clientUrl}/dashboard`;
 
     const portalSession = await stripe.billingPortal.sessions.create({
       customer: user.stripeCustomerId,
@@ -366,6 +411,7 @@ module.exports = {
   updatePricing,
   getStatus,
   createCheckoutSession,
+  verifySession,
   createPortalSession,
   cancelSubscription,
   handleWebhook,

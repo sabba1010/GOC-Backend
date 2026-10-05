@@ -308,7 +308,7 @@ const setupChatSocket = (io) => {
     });
 
     // ── EVENT: chat:read ─────────────────────────
-    socket.on("chat:read", async ({ lastReadMessageId }) => {
+    socket.on("chat:read", async ({ roomId = "global_chat", lastReadMessageId } = {}) => {
       try {
         await ChatReadState.findOneAndUpdate(
           { userId: user._id, roomId },

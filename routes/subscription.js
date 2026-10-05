@@ -6,6 +6,7 @@ const {
   updatePricing,
   getStatus,
   createCheckoutSession,
+  verifySession,
   createPortalSession,
   cancelSubscription,
   handleWebhook,
@@ -19,6 +20,7 @@ router.put("/admin/pricing", protect, authorizeRoles("admin"), updatePricing);
 
 // User Subscription routes (Protected)
 router.get("/status", protect, getStatus);
+router.get("/verify-session", protect, verifySession);
 router.post("/create-checkout-session", protect, createCheckoutSession);
 router.post("/create-portal-session", protect, createPortalSession);
 router.post("/cancel", protect, cancelSubscription);
