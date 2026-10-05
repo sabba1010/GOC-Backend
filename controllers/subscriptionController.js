@@ -161,37 +161,56 @@ const createCheckoutSession = async (req, res) => {
 const verifySession = async (req, res) => {
   try {
     const { session_id } = req.query;
-    if (!session_id) {
-      return res.status(400).json({ message: "Session ID is required." });
-    }
+    let user = await User.findById(req.user._id);
 
-    const stripe = getStripe();
-    const session = await stripe.checkout.sessions.retrieve(session_id);
+    if (session_id) {
+      try {
+        const stripe = getStripe();
+        const session = await stripe.checkout.sessions.retrieve(session_id);
 
-    if (session && session.payment_status === "paid") {
-      const userId = session.metadata?.userId || req.user._id.toString();
-      const plan = session.metadata?.plan || "monthly";
-      const customerId = session.customer;
-      const subscriptionId = session.subscription;
+        if (session && session.payment_status === "paid") {
+          const userId = session.metadata?.userId || req.user._id.toString();
+          const plan = session.metadata?.plan || "monthly";
+          const customerId = session.customer;
+          const subscriptionId = session.subscription;
 
-      if (subscriptionId) {
-        const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-        await syncUserSubscription(userId, customerId, subscription, plan);
+          if (subscriptionId) {
+            const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+            await syncUserSubscription(userId, customerId, subscription, plan);
+          } else {
+            const isMonthly = plan === "monthly";
+            const now = new Date();
+            const periodEnd = new Date();
+            if (isMonthly) {
+              periodEnd.setMonth(periodEnd.getMonth() + 1);
+            } else {
+              periodEnd.setFullYear(periodEnd.getFullYear() + 1);
+            }
+            user.subscriptionPlan = plan;
+            user.subscriptionStatus = "active";
+            user.currentPeriodStart = now;
+            user.currentPeriodEnd = periodEnd;
+            if (customerId) user.stripeCustomerId = customerId;
+            await user.save();
+          }
+        }
+      } catch (stripeErr) {
+        console.warn("Could not retrieve Stripe session during verifySession:", stripeErr.message);
       }
     }
 
-    const updatedUser = await User.findById(req.user._id);
+    user = await User.findById(req.user._id);
     res.status(200).json({
       success: true,
       subscription: {
-        hasAccess: updatedUser.hasResourceAccess(),
-        subscriptionPlan: updatedUser.subscriptionPlan,
-        subscriptionStatus: updatedUser.subscriptionStatus,
-        currentPeriodStart: updatedUser.currentPeriodStart,
-        currentPeriodEnd: updatedUser.currentPeriodEnd,
-        cancelAtPeriodEnd: updatedUser.cancelAtPeriodEnd,
-        stripeCustomerId: updatedUser.stripeCustomerId,
-        role: updatedUser.role,
+        hasAccess: user.hasResourceAccess(),
+        subscriptionPlan: user.subscriptionPlan,
+        subscriptionStatus: user.subscriptionStatus,
+        currentPeriodStart: user.currentPeriodStart,
+        currentPeriodEnd: user.currentPeriodEnd,
+        cancelAtPeriodEnd: user.cancelAtPeriodEnd,
+        stripeCustomerId: user.stripeCustomerId,
+        role: user.role,
       },
     });
   } catch (error) {
@@ -392,18 +411,30 @@ async function syncUserSubscription(userId, customerId, subscription, fallbackPl
   }
   if (!user) return;
 
-  const plan = fallbackPlan || subscription.metadata?.plan || (subscription.items?.data[0]?.plan?.interval === "year" ? "yearly" : "monthly");
+  const plan = fallbackPlan || subscription.metadata?.plan || (subscription.items?.data?.[0]?.plan?.interval === "year" ? "yearly" : "monthly");
+  const item = subscription.items?.data?.[0];
+
+  const periodStartRaw =
+    subscription.current_period_start ||
+    item?.current_period_start ||
+    subscription.start_date ||
+    Math.floor(Date.now() / 1000);
+
+  const periodEndRaw =
+    subscription.current_period_end ||
+    item?.current_period_end ||
+    (Math.floor(Date.now() / 1000) + (plan === "yearly" ? 365 : 30) * 86400);
 
   user.stripeCustomerId = customerId || user.stripeCustomerId;
   user.stripeSubscriptionId = subscription.id;
   user.subscriptionPlan = plan;
-  user.subscriptionStatus = subscription.status;
-  user.currentPeriodStart = new Date(subscription.current_period_start * 1000);
-  user.currentPeriodEnd = new Date(subscription.current_period_end * 1000);
+  user.subscriptionStatus = subscription.status || "active";
+  user.currentPeriodStart = new Date(periodStartRaw * 1000);
+  user.currentPeriodEnd = new Date(periodEndRaw * 1000);
   user.cancelAtPeriodEnd = Boolean(subscription.cancel_at_period_end);
 
   await user.save();
-  console.log(`✅ User subscription synced: ${user.email} -> ${user.subscriptionPlan} (${user.subscriptionStatus})`);
+  console.log(`✅ User subscription synced: ${user.email} -> ${user.subscriptionPlan} (${user.subscriptionStatus}) valid until ${user.currentPeriodEnd}`);
 }
 
 module.exports = {
