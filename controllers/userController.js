@@ -274,9 +274,15 @@ const getAllSubmissions = async (req, res) => {
     const users = await User.find({ 
       appliedOpportunities: { $exists: true, $not: { $size: 0 } } 
     })
-    .populate("appliedOpportunities")
-    .populate("applications.opportunity")
-    .select("-password");
+    .populate({
+      path: "appliedOpportunities",
+      select: "title category organization deadline",
+    })
+    .populate({
+      path: "applications.opportunity",
+      select: "title category organization deadline",
+    })
+    .select("-password -certificates -avatar");
     
     let submissions = [];
     users.forEach(user => {

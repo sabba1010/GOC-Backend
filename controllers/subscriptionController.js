@@ -71,11 +71,25 @@ const updatePricing = async (req, res) => {
   }
 };
 
+// In-memory cache for admin subscription stats to avoid repeated external Stripe roundtrips
+let adminStatsCache = null;
+let adminStatsCacheTime = 0;
+const STATS_CACHE_TTL_MS = 45 * 1000;
+
+const invalidateStatsCache = () => {
+  adminStatsCache = null;
+  adminStatsCacheTime = 0;
+};
+
 // @desc    Get subscription revenue & package statistics (Admin only)
 // @route   GET /api/subscription/admin/stats
 // @access  Private/Admin
 const getAdminStats = async (req, res) => {
   try {
+    if (adminStatsCache && Date.now() - adminStatsCacheTime < STATS_CACHE_TTL_MS) {
+      return res.status(200).json({ success: true, stats: adminStatsCache, cached: true });
+    }
+
     const setting = await Setting.findOne({ key: "subscription_pricing" });
     const monthlyRate = setting?.monthlyPrice || 8;
     const yearlyRate = setting?.yearlyPrice || 12;
@@ -156,22 +170,27 @@ const getAdminStats = async (req, res) => {
       totalRevenue = monthlyRevenue + yearlyRevenue;
     }
 
+    const statsResult = {
+      totalRevenue: Number(totalRevenue.toFixed(2)),
+      monthlyRevenue: Number(monthlyRevenue.toFixed(2)),
+      yearlyRevenue: Number(yearlyRevenue.toFixed(2)),
+      activeMonthlyCount,
+      activeYearlyCount,
+      totalActiveSubscribers,
+      inactiveCount,
+      rates: {
+        monthly: monthlyRate,
+        yearly: yearlyRate,
+      },
+      recentTransactions: recentTransactions.slice(0, 10),
+    };
+
+    adminStatsCache = statsResult;
+    adminStatsCacheTime = Date.now();
+
     res.status(200).json({
       success: true,
-      stats: {
-        totalRevenue: Number(totalRevenue.toFixed(2)),
-        monthlyRevenue: Number(monthlyRevenue.toFixed(2)),
-        yearlyRevenue: Number(yearlyRevenue.toFixed(2)),
-        activeMonthlyCount,
-        activeYearlyCount,
-        totalActiveSubscribers,
-        inactiveCount,
-        rates: {
-          monthly: monthlyRate,
-          yearly: yearlyRate,
-        },
-        recentTransactions: recentTransactions.slice(0, 10),
-      },
+      stats: statsResult,
     });
   } catch (error) {
     console.error("Admin Subscription Stats Error:", error);
@@ -542,6 +561,7 @@ async function syncUserSubscription(userId, customerId, subscription, fallbackPl
   user.cancelAtPeriodEnd = Boolean(subscription.cancel_at_period_end);
 
   await user.save();
+  invalidateStatsCache();
   console.log(`✅ User subscription synced: ${user.email} -> ${user.subscriptionPlan} (${user.subscriptionStatus}) valid until ${user.currentPeriodEnd}`);
 }
 

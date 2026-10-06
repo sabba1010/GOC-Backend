@@ -21,7 +21,19 @@ const createOpportunity = async (req, res) => {
 // ──────────────────────────────────────────────
 const getAllOpportunities = async (req, res) => {
   try {
-    const opps = await Opportunity.find({}).sort({ createdAt: -1 });
+    const { countOnly, summary } = req.query;
+
+    if (countOnly === "true") {
+      const count = await Opportunity.countDocuments();
+      return res.status(200).json({ success: true, count, opportunities: [] });
+    }
+
+    const query = Opportunity.find({}).sort({ createdAt: -1 });
+    if (summary === "true") {
+      query.select("-image");
+    }
+
+    const opps = await query;
     res.status(200).json({ success: true, count: opps.length, opportunities: opps });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
