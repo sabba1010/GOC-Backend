@@ -56,7 +56,7 @@ const getOrCreateStripePrice = async (plan) => {
     price = await stripe.prices.create({
       product: product.id,
       unit_amount: amountInCents,
-      currency: setting.currency || "usd",
+      currency: "usd",
       recurring: { interval },
       metadata: { goc_plan: plan },
     });

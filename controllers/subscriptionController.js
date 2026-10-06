@@ -55,6 +55,7 @@ const updatePricing = async (req, res) => {
 
     setting.monthlyPrice = mPrice;
     setting.yearlyPrice = yPrice;
+    setting.currency = "usd";
     await setting.save();
 
     res.status(200).json({
@@ -63,7 +64,7 @@ const updatePricing = async (req, res) => {
       pricing: {
         monthlyPrice: setting.monthlyPrice,
         yearlyPrice: setting.yearlyPrice,
-        currency: setting.currency || "usd",
+        currency: "usd",
       },
     });
   } catch (error) {
