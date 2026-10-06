@@ -59,18 +59,39 @@ const createResource = async (req, res) => {
   }
 };
 
-// @desc    Get all published resources
+// @desc    Get all published resources (lightweight list without heavy PDF binary text)
 // @route   GET /api/resources
 // @access  Public / Private
 const getResources = async (req, res) => {
   try {
-    const resources = await Resource.find({ status: "Published" })
+    const { includePdf } = req.query;
+    let query = Resource.find({ status: "Published" })
       .populate("uploadedBy", "name")
       .sort({ createdAt: -1 });
 
+    if (includePdf !== "true") {
+      query = query.select("-pdfFile");
+    }
+
+    const resources = await query;
     res.status(200).json({ success: true, count: resources.length, resources });
   } catch (error) {
     res.status(500).json({ message: "Failed to fetch resources", error: error.message });
+  }
+};
+
+// @desc    Get single resource by ID (includes PDF binary data for viewing/downloading)
+// @route   GET /api/resources/:id
+// @access  Public / Private
+const getResourceById = async (req, res) => {
+  try {
+    const resource = await Resource.findById(req.params.id).populate("uploadedBy", "name");
+    if (!resource) {
+      return res.status(404).json({ message: "Resource not found" });
+    }
+    res.status(200).json({ success: true, resource });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch resource details", error: error.message });
   }
 };
 
@@ -81,6 +102,7 @@ const getAllResourcesAdmin = async (req, res) => {
   try {
     const resources = await Resource.find()
       .populate("uploadedBy", "name")
+      .select("-pdfFile")
       .sort({ createdAt: -1 });
 
     res.status(200).json({ success: true, count: resources.length, resources });
@@ -108,4 +130,4 @@ const deleteResource = async (req, res) => {
   }
 };
 
-module.exports = { createResource, getResources, getAllResourcesAdmin, deleteResource };
+module.exports = { createResource, getResources, getResourceById, getAllResourcesAdmin, deleteResource };

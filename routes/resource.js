@@ -8,6 +8,7 @@ const { requireSubscription } = require("../middleware/subscriptionMiddleware");
 const {
   createResource,
   getResources,
+  getResourceById,
   getAllResourcesAdmin,
   deleteResource,
 } = require("../controllers/resourceController");
@@ -42,6 +43,9 @@ router.get("/", protect, requireSubscription, getResources);
 
 // @route   GET /api/resources/admin    — Admin all
 router.get("/admin", protect, authorizeRoles("admin"), getAllResourcesAdmin);
+
+// @route   GET /api/resources/:id      — Get single resource details with PDF
+router.get("/:id", protect, requireSubscription, getResourceById);
 
 // @route   POST /api/resources         — Admin upload
 router.post("/", protect, authorizeRoles("admin"), uploadFields, createResource);

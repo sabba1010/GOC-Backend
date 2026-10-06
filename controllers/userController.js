@@ -457,11 +457,14 @@ const getUserReminders = async (req, res) => {
 
     if (!user) return res.status(404).json({ message: "User not found" });
 
+    const savedOpps = (user.savedOpportunities || []).filter(Boolean);
+    const appliedOpps = (user.appliedOpportunities || []).filter(Boolean);
+
     res.status(200).json({
       success: true,
       reminders: user.reminders || [],
-      savedOpportunities: user.savedOpportunities || [],
-      appliedOpportunities: user.appliedOpportunities || [],
+      savedOpportunities: savedOpps,
+      appliedOpportunities: appliedOpps,
     });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });

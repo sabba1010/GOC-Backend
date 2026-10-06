@@ -79,4 +79,6 @@ const chatRoomSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+chatRoomSchema.index({ type: 1, participants: 1 });
+
 module.exports = mongoose.model("ChatRoom", chatRoomSchema);

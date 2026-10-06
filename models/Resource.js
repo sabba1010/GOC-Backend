@@ -76,4 +76,7 @@ const resourceSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+resourceSchema.index({ status: 1, createdAt: -1 });
+resourceSchema.index({ category: 1 });
+
 module.exports = mongoose.model("Resource", resourceSchema);

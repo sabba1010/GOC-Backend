@@ -165,6 +165,8 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+userSchema.index({ role: 1, status: 1 });
+
 // Method to check if user has active resource dashboard access
 userSchema.methods.hasResourceAccess = function () {
   if (this.role === "admin" || this.role === "mentor") return true;
