@@ -23,16 +23,16 @@ connectDB();
 app.use(cors({
   origin: function (origin, callback) {
     if (!origin) return callback(null, true);
-    
+
     const allowedOrigins = [
       "http://localhost:5173",
       "http://localhost:3000",
       "http://localhost:8080",
       "https://duplicate-web-pal.vercel.app"
     ];
-    
+
     const isVercel = origin.endsWith(".vercel.app");
-    
+
     if (allowedOrigins.includes(origin) || isVercel) {
       callback(null, true);
     } else {
@@ -66,6 +66,7 @@ const io = new Server(server, {
         "http://localhost:5173",
         "http://localhost:3000",
         "http://localhost:8080",
+        "http://192.168.31.133:8080",
         "https://duplicate-web-pal.vercel.app",
       ];
       const isVercel = origin.endsWith(".vercel.app");
