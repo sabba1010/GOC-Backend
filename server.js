@@ -19,28 +19,51 @@ const app = express();
 // ── Connect MongoDB ────────────────────────────
 connectDB();
 
-// ── Middleware ─────────────────────────────────
-app.use(cors({
+// ── CORS Configuration ─────────────────────────
+const isOriginAllowed = (origin) => {
+  if (!origin) return true;
+
+  const allowedOrigins = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "http://localhost:8080",
+    "http://192.168.31.133:8080",
+    "https://duplicate-web-pal.vercel.app",
+  ];
+
+  if (allowedOrigins.includes(origin)) return true;
+  if (origin.endsWith(".vercel.app")) return true;
+
+  // Allow localhost / 127.0.0.1 on any port
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return true;
+
+  // Allow local LAN IPs (192.168.x.x, 10.x.x.x, 172.16-31.x.x) on any port
+  if (/^https?:\/\/(192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)(:\d+)?$/.test(origin)) return true;
+
+  if (process.env.ALLOWED_ORIGINS) {
+    const envOrigins = process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim());
+    if (envOrigins.includes(origin)) return true;
+  }
+
+  return false;
+};
+
+const corsOptions = {
   origin: function (origin, callback) {
-    if (!origin) return callback(null, true);
-
-    const allowedOrigins = [
-      "http://localhost:5173",
-      "http://localhost:3000",
-      "http://localhost:8080",
-      "https://duplicate-web-pal.vercel.app"
-    ];
-
-    const isVercel = origin.endsWith(".vercel.app");
-
-    if (allowedOrigins.includes(origin) || isVercel) {
+    if (isOriginAllowed(origin)) {
       callback(null, true);
     } else {
       callback(new Error("Not allowed by CORS"));
     }
   },
   credentials: true,
-}));
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+};
+
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
+
 // ── Stripe Webhook (Raw Body Parser before express.json) ──────
 app.post("/api/subscription/webhook", express.raw({ type: "application/json" }), require("./controllers/subscriptionController").handleWebhook);
 
@@ -61,16 +84,7 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: function (origin, callback) {
-      if (!origin) return callback(null, true);
-      const allowedOrigins = [
-        "http://localhost:5173",
-        "http://localhost:3000",
-        "http://localhost:8080",
-        "http://192.168.31.133:8080",
-        "https://duplicate-web-pal.vercel.app",
-      ];
-      const isVercel = origin.endsWith(".vercel.app");
-      if (allowedOrigins.includes(origin) || isVercel) {
+      if (isOriginAllowed(origin)) {
         callback(null, true);
       } else {
         callback(new Error("Not allowed by CORS"));
