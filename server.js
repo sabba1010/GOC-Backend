@@ -23,26 +23,33 @@ connectDB();
 const isOriginAllowed = (origin) => {
   if (!origin) return true;
 
+  const cleanOrigin = origin.replace(/\/+$/, "");
+
   const allowedOrigins = [
     "http://localhost:5173",
     "http://localhost:3000",
     "http://localhost:8080",
     "http://192.168.31.133:8080",
     "https://duplicate-web-pal.vercel.app",
+    "http://50.6.249.165",
+    "https://50.6.249.165",
   ];
 
-  if (allowedOrigins.includes(origin)) return true;
-  if (origin.endsWith(".vercel.app")) return true;
+  if (allowedOrigins.includes(cleanOrigin)) return true;
+  if (cleanOrigin.endsWith(".vercel.app")) return true;
+
+  // Allow 50.6.249.165 on any port (HTTP & HTTPS)
+  if (/^https?:\/\/50\.6\.249\.165(:\d+)?$/.test(cleanOrigin)) return true;
 
   // Allow localhost / 127.0.0.1 on any port
-  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return true;
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(cleanOrigin)) return true;
 
   // Allow local LAN IPs (192.168.x.x, 10.x.x.x, 172.16-31.x.x) on any port
-  if (/^https?:\/\/(192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)(:\d+)?$/.test(origin)) return true;
+  if (/^https?:\/\/(192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)(:\d+)?$/.test(cleanOrigin)) return true;
 
   if (process.env.ALLOWED_ORIGINS) {
-    const envOrigins = process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim());
-    if (envOrigins.includes(origin)) return true;
+    const envOrigins = process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim().replace(/\/+$/, ""));
+    if (envOrigins.includes(cleanOrigin)) return true;
   }
 
   return false;
@@ -121,6 +128,6 @@ app.use((err, req, res, next) => {
 
 // ── Start Server ───────────────────────────────
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
-  console.log(`🚀 Server & Socket.IO running on http://localhost:${PORT}`);
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(`🚀 Server & Socket.IO running on port ${PORT} (0.0.0.0)`);
 });
